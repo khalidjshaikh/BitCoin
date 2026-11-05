@@ -1,4 +1,4 @@
-package com.example.bitcoin;
+package com.artificialintelligence.bitcoin;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;

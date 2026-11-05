@@ -1,4 +1,4 @@
-package com.example.bitcoin;
+package com.artificialintelligence.bitcoin;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
