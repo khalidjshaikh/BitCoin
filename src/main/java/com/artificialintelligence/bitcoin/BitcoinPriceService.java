@@ -2,6 +2,8 @@ package com.artificialintelligence.bitcoin;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +21,10 @@ public class BitcoinPriceService {
     @Value("${bitcoin.price.url:https://api.kraken.com/0/public/Ticker?pair=XBTUSD}")
     private String priceUrl;
 
+    private volatile BitcoinPrice lastKnownPrice;
+
+    @CircuitBreaker(name = "bitcoinPrice", fallbackMethod = "fetchPriceFallback")
+    @Retry(name = "bitcoinPrice", fallbackMethod = "fetchPriceFallback")
     public BitcoinPrice fetchPrice() {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(priceUrl))
@@ -45,9 +51,19 @@ public class BitcoinPriceService {
                     ? lastTrade.get(0).asDouble()
                     : ticker.path("a").isArray() ? ticker.path("a").get(0).asDouble() : 0.0;
             String updated = java.time.Instant.now().toString();
-            return new BitcoinPrice("Kraken", "USD", price, updated);
+            BitcoinPrice priceResult = new BitcoinPrice("Kraken", "USD", price, updated);
+            lastKnownPrice = priceResult;
+            return priceResult;
         } catch (Exception e) {
             throw new RuntimeException("Failed to fetch Bitcoin price", e);
         }
+    }
+
+    public BitcoinPrice fetchPriceFallback(Throwable throwable) {
+        if (lastKnownPrice != null) {
+            return new BitcoinPrice(lastKnownPrice.source(), lastKnownPrice.currency(),
+                    lastKnownPrice.price(), lastKnownPrice.updatedAt() + " (cached)");
+        }
+        return new BitcoinPrice("fallback", "USD", 0.0, java.time.Instant.now().toString());
     }
 }
